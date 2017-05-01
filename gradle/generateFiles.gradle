@@ -1,0 +1,116 @@
+task generateFiles() {
+    doLast {
+        double actualMaxDistanceError = project.hasProperty('maxDistanceError') ?
+                Double.parseDouble(maxDistanceError) : 40000.0d
+        int actualUserCount = project.hasProperty('userCount') ?
+                Integer.parseInt(userCount) : 100000
+        String actualMappingPointsFileName = project.hasProperty('mappingPointsFileName') ?
+                mappingPointsFileName : "./mappings.txt"
+        String actualUserLabelsFileName = project.hasProperty('userLabelsFileName') ?
+                userLabelsFileName : "./user_labels.txt"
+
+        generateFiles(
+                actualMaxDistanceError,
+                actualUserCount,
+                actualMappingPointsFileName,
+                actualUserLabelsFileName
+        )
+
+        println("Files $actualMappingPointsFileName and $actualUserLabelsFileName have been generated with parameters: " +
+                "actualUserCount: $actualUserCount and actualMaxDistanceError: $actualMaxDistanceError")
+    }
+}
+
+static generateFiles(
+        double maxDistanceError,
+        int userCount,
+        String mappingPointsFileName,
+        String userLabelsFileName
+) {
+    assert maxDistanceError > 0
+    assert userCount > 0
+    assert !mappingPointsFileName.empty
+    assert !userLabelsFileName.empty
+
+    def mappingPoints = generateMappingPoints(maxDistanceError)
+    def userLabels = generateUserMapLabels(userCount)
+    writeMappingPointsToFile(mappingPointsFileName, mappingPoints)
+    writeUserMapLabelsToFile(userLabelsFileName, userLabels)
+}
+
+@groovy.transform.ToString(includeFields = true, includeNames = true)
+class UserMapLabel {
+    int user_id
+    double lon
+    double lat
+}
+
+@groovy.transform.ToString(includeFields = true, includeNames = true)
+class MappingPoint {
+    int longitude
+    int latitude
+    double maxDistance
+}
+
+static def writeUserMapLabelsToFile(String fileName, List<UserMapLabel> userMapLabels) {
+    def file = new File(fileName)
+    file.withWriter('UTF-8') { out ->
+        userMapLabels.each {
+            out.println("${it.user_id} ${it.lon} ${it.lat}")
+        }
+    }
+}
+
+static def generateUserMapLabels(int userCount) {
+    (1..userCount).collect { userId ->
+        generateUserMapLabel(userId)
+    }
+}
+
+static def generateUserMapLabel(userId) {
+    new UserMapLabel(
+            user_id: userId,
+            lon: generateLongitude(),
+            lat: generateLatitude()
+    )
+}
+
+static def generateLongitude() {
+    new Random().nextDouble() * 356 - 178 // [-178; 178)
+}
+
+static def generateLatitude() {
+    new Random().nextDouble() * 178 - 89 // [-89; 89)
+}
+
+static def writeMappingPointsToFile(String fileName, List<MappingPoint> mappingPoints) {
+    def file = new File(fileName)
+    file.withWriter('UTF-8') { out ->
+        mappingPoints.each {
+            out.println("${it.longitude} ${it.latitude} ${it.maxDistance}")
+        }
+    }
+}
+
+static def generateMappingPoints(double maxDistanceError) {
+    def mappingPoints = []
+    (-180..180).each { longitude ->
+        (-90..90).each { latitude ->
+            mappingPoints += generateMappingPoint(longitude, latitude, maxDistanceError)
+        }
+    }
+
+    mappingPoints
+}
+
+static def generateMappingPoint(int longitude, int latitude, double maxDistanceError) {
+    new MappingPoint(
+            longitude: longitude,
+            latitude: latitude,
+            maxDistance: generateDistanceError(maxDistanceError)
+    )
+}
+
+static def generateDistanceError(double maxDistanceError) {
+    new Random().nextDouble() * maxDistanceError
+}
